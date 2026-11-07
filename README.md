@@ -26,6 +26,7 @@ The installer stores the application under:
 ```
 
 The installer is an online bootstrapper, so it remains small. It does not contain Python, PyTorch, or the model inside the EXE.
+The installed desktop shortcut and the running MyRotoTool window use the MyRotoTool icon instead of the default Python icon.
 
 ### Manual installation
 

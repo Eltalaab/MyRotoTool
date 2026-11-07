@@ -108,11 +108,13 @@ def extract_zip(archive, destination):
 
 
 def create_shortcut(target, shortcut_path):
+    icon_path = local_app_dir() / "assets" / "myrototool-icon.ico"
     command = (
         "$shell = New-Object -ComObject WScript.Shell; "
         f"$shortcut = $shell.CreateShortcut('{shortcut_path}'); "
         f"$shortcut.TargetPath = '{target}'; "
         f"$shortcut.WorkingDirectory = '{Path(target).parent}'; "
+        f"$shortcut.IconLocation = '{icon_path},0'; "
         "$shortcut.Save()"
     )
     run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command])

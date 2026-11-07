@@ -21,6 +21,11 @@ ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
 
+def resource_path(relative_path):
+    base_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_dir, relative_path)
+
+
 class ResolveMagicMaskApp(ctk.CTk):
     """
     DaVinci Resolve - Magic Mask Studio
@@ -32,6 +37,9 @@ class ResolveMagicMaskApp(ctk.CTk):
     def __init__(self, initial_video=None):
         super().__init__()
         self.title("DaVinci Resolve - Magic Mask Studio")
+        icon_path = resource_path(os.path.join("assets", "myrototool-icon.ico"))
+        if os.path.isfile(icon_path):
+            self.iconbitmap(icon_path)
         self.geometry("1300x870")
         self.minsize(1120, 760)
 
