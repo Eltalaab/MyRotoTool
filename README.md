@@ -17,7 +17,7 @@ AI-assisted rotoscoping tool for **DaVinci Resolve/Fusion** using Meta's SAM2 mo
 
 ### One-click online installer
 
-For Windows users with an NVIDIA GPU and a compatible CUDA driver, download `MyRotoTool-Setup.exe` from the repository's [Releases page](https://github.com/Eltalaab/MyRotoTool/releases) and double-click it. The installer downloads Python 3.11, creates an isolated environment, installs CUDA-enabled PyTorch 2.5.1 (CUDA 12.1), SAM2 and the other dependencies, downloads the SAM2 model, removes unused development libraries, creates a desktop shortcut, and starts the tool. Internet access is required during the first installation.
+For Windows users with an NVIDIA GPU and a compatible CUDA driver, download `MyRotoTool-Setup.exe` from the repository's [Releases page](https://github.com/Eltalaab/MyRotoTool/releases) and double-click it. The installer downloads Python 3.11, creates an isolated environment, installs CUDA-enabled PyTorch 2.5.1 (CUDA 12.1), SAM2 and the other dependencies, downloads the SAM2 model, removes unused development libraries, installs the Fusion node, creates a desktop shortcut, and starts the tool. Internet access is required during the first installation.
 
 The installer stores the application under:
 
@@ -27,6 +27,8 @@ The installer stores the application under:
 
 The installer is an online bootstrapper, so it remains small. It does not contain Python, PyTorch, or the model inside the EXE. The final installed footprint is targeted at approximately 3.9 GB, while at least 7 GB of free disk space is needed during installation.
 The installed desktop shortcut and the running MyRotoTool window use the MyRotoTool icon instead of the default Python icon.
+
+After installation, restart DaVinci Resolve. Open the Fusion page, press `Shift+Space`, search for **Local AI Rotoscope**, and add the node. Connect the clip to the node's input, then click **Start AI Rotoscope** on the node. The node launches the installed MyRotoTool app and syncs the selected Resolve clip automatically.
 
 ### Manual installation
 
@@ -97,7 +99,7 @@ The integration files are included in this repository:
 - `timeline_sync.py` — synchronizes the active Resolve timeline and clip context.
 - `detect_clip.py` — detects the active clip and writes the local context file.
 
-The exact installation location for Resolve scripts can differ by Resolve version and operating-system configuration. If Resolve does not detect the integration automatically, copy the required Lua/Fuse files to the corresponding Resolve/Fusion scripts or Fusion Fuse folder, then restart Resolve. The Python app can still be tested independently with a local video file.
+The installer places `LocalAIRoto.fuse` in the user's Fusion `Fuses` folder and copies the Resolve bridge scripts into the user's Fusion `Scripts\Comp` folder. If Resolve was open during installation, restart it before searching for the node.
 
 ## Project files
 

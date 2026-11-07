@@ -181,6 +181,19 @@ def remove_development_files(venv_dir):
             path.unlink(missing_ok=True)
 
 
+def install_fusion_node(app_dir):
+    appdata = Path(os.environ.get("APPDATA", Path.home()))
+    fusion_root = appdata / "Blackmagic Design" / "DaVinci Resolve" / "Support" / "Fusion"
+    fuse_dir = fusion_root / "Fuses"
+    fuse_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(app_dir / "LocalAIRoto.fuse", fuse_dir / "LocalAIRoto.fuse")
+
+    scripts_dir = fusion_root / "Scripts" / "Comp"
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+    for script_name in ("resolve_script_bridge.py", "launch_from_resolve.py", "timeline_sync.py", "detect_clip.py"):
+        shutil.copy2(app_dir / script_name, scripts_dir / script_name)
+
+
 class Installer:
     def __init__(self, root):
         self.root = root
@@ -270,6 +283,8 @@ class Installer:
                 run([str(vpython), "-m", "pip", "install", str(sam2_source)])
                 self.message("Removing unused CUDA development files...")
                 remove_development_files(venv_dir)
+                self.message("Installing the Fusion node...")
+                install_fusion_node(app_dir)
 
                 model = app_dir / "sam2_hiera_tiny.pt"
                 if not model.is_file() or model.stat().st_size < 100_000_000:

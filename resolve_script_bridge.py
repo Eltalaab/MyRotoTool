@@ -11,9 +11,14 @@ import json
 import time
 import subprocess
 
-CONTEXT_FILE = r"E:\Apps\MyRotoTool\timeline_context.json"
-CURRENT_CLIP_FILE = r"E:\Apps\MyRotoTool\current_clip.txt"
-ROTO_BAT = r"E:\Apps\MyRotoTool\run_roto.bat"
+TOOL_DIR = os.environ.get(
+    "MYROTOTOOL_HOME",
+    os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "MyRotoTool"),
+)
+
+CONTEXT_FILE = os.path.join(TOOL_DIR, "timeline_context.json")
+CURRENT_CLIP_FILE = os.path.join(TOOL_DIR, "current_clip.txt")
+ROTO_BAT = os.path.join(TOOL_DIR, "run_roto.bat")
 
 def get_resolve_objects():
     res = globals().get("resolve")

@@ -155,7 +155,10 @@ def main():
     clip_path = get_clip_path_comprehensive(comp)
     log(f"FINAL RESOLVED CLIP PATH: '{clip_path}'")
 
-    tool_dir = r"E:\Apps\MyRotoTool"
+    tool_dir = os.environ.get(
+        "MYROTOTOOL_HOME",
+        os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "MyRotoTool"),
+    )
     if clip_path:
         try:
             with open(os.path.join(tool_dir, "current_clip.txt"), "w", encoding="utf-8") as cf:

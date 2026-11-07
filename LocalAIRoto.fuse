@@ -7,10 +7,18 @@ FuRegisterClass("LocalAIRoto", CT_Tool, {
 
 local function log_debug(msg)
     pcall(function()
-        local f = io.open("E:\\Apps\\MyRotoTool\\fuse_debug.log", "a")
+        local f = io.open((os.getenv("LOCALAPPDATA") or "") .. "\\MyRotoTool\\fuse_debug.log", "a")
         if f then
             f:write(os.date("[%Y-%m-%d %H:%M:%S] ") .. tostring(msg) .. "\n")
             f:close()
+        end
+
+        local function tool_path(name)
+            local root = os.getenv("MYROTOTOOL_HOME")
+            if not root or root == "" then
+                root = (os.getenv("LOCALAPPDATA") or "") .. "\\MyRotoTool"
+            end
+            return root .. "\\" .. name
         end
     end)
 end
@@ -223,7 +231,7 @@ local function AutoFindClip(tool_instance, comp, time)
 
     -- 4. Fast SQLite detector from active Resolve project
     local ok_py, py_clip = pcall(function()
-        local pipe = io.popen('"E:\\Apps\\MyRotoTool\\.venv\\Scripts\\python.exe" "E:\\Apps\\MyRotoTool\\detect_clip.py"')
+        local pipe = io.popen('"' .. tool_path(".venv\\Scripts\\python.exe") .. '" "' .. tool_path("detect_clip.py") .. '"')
         if pipe then
             local res = pipe:read("*a")
             pipe:close()
@@ -244,7 +252,7 @@ local function AutoFindClip(tool_instance, comp, time)
 
     -- 5. Fallback: read existing current_clip.txt
     local ok_cc, cc_clip = pcall(function()
-        local f = io.open("E:\\Apps\\MyRotoTool\\current_clip.txt", "r")
+        local f = io.open(tool_path("current_clip.txt"), "r")
         if f then
             local content = f:read("*a")
             f:close()
@@ -278,7 +286,7 @@ function NotifyChanged(inp, param, time)
 
         if clip and clip ~= "" then
             pcall(function()
-                local f = io.open("E:\\Apps\\MyRotoTool\\current_clip.txt", "w")
+                local f = io.open(tool_path("current_clip.txt"), "w")
                 if f then
                     f:write(clip)
                     f:close()
@@ -289,7 +297,7 @@ function NotifyChanged(inp, param, time)
 
         -- Refresh Timeline Context Bridge
         pcall(function()
-            local p = io.popen('"E:\\Apps\\MyRotoTool\\.venv\\Scripts\\python.exe" "E:\\Apps\\MyRotoTool\\timeline_sync.py"')
+            local p = io.popen('"' .. tool_path(".venv\\Scripts\\python.exe") .. '" "' .. tool_path("timeline_sync.py") .. '"')
             if p then p:close() end
         end)
 
@@ -297,7 +305,7 @@ function NotifyChanged(inp, param, time)
         local launched = false
         if bmd and bmd.openurl then
             local ok_launch = pcall(function()
-                bmd.openurl("file:///E:/Apps/MyRotoTool/run_roto.bat")
+                bmd.openurl("file:///" .. string.gsub(tool_path("run_roto.bat"), "\\", "/"))
             end)
             if ok_launch then
                 launched = true
@@ -306,7 +314,7 @@ function NotifyChanged(inp, param, time)
         end
         if not launched then
             pcall(function()
-                os.execute('start "" "E:\\Apps\\MyRotoTool\\run_roto.bat"')
+                os.execute('start "" "' .. tool_path("run_roto.bat") .. '"')
             end)
             log_debug("Triggered os.execute batch launcher (fallback)")
         end
