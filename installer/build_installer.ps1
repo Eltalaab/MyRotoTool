@@ -9,6 +9,7 @@ try {
     }
     & $runner[0] $runner[1..($runner.Count - 1)] --noconfirm --clean --onefile --windowed `
         --name MyRotoTool-Setup `
+        --icon "$project\assets\myrototool-icon.ico" `
         --distpath "$project\installer\dist" `
         "$project\installer\bootstrap.py"
     if ($LASTEXITCODE -ne 0) {

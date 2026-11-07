@@ -1,5 +1,7 @@
 # MyRotoTool
 
+![MyRotoTool](assets/myrototool-banner.png)
+
 AI-assisted rotoscoping tool for **DaVinci Resolve/Fusion** using Meta's SAM2 model. The desktop app can read the active clip from Resolve, generate a mask, preview the result, and export the mask for use in Resolve.
 
 ## Requirements
