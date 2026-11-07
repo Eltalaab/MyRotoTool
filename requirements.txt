@@ -1,0 +1,7 @@
+customtkinter
+opencv-python
+pillow
+numpy
+torch
+torchvision
+git+https://github.com/facebookresearch/sam2.git

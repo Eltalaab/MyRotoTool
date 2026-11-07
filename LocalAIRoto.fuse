@@ -1,0 +1,319 @@
+FuRegisterClass("LocalAIRoto", CT_Tool, {
+    REGS_Name = "Local AI Rotoscope",
+    REGS_Category = "Matte",
+    REGS_OpIconString = "AIR",
+    REGS_OpDescription = "AI Rotoscope Integration for Fusion",
+})
+
+local function log_debug(msg)
+    pcall(function()
+        local f = io.open("E:\\Apps\\MyRotoTool\\fuse_debug.log", "a")
+        if f then
+            f:write(os.date("[%Y-%m-%d %H:%M:%S] ") .. tostring(msg) .. "\n")
+            f:close()
+        end
+    end)
+end
+
+function Create()
+    BtnLaunch = self:AddInput("1. Start AI Rotoscope", "LaunchBtn", {
+        LINKID_DataType = "Number",
+        INPID_InputControl = "ButtonControl",
+        INP_DoNotifyChanged = true,
+    })
+    InImage = self:AddInput("Input", "Input", {
+        LINKID_DataType = "Image",
+        LINK_Main = 1,
+    })
+    OutImage = self:AddOutput("Output", "Output", {
+        LINKID_DataType = "Image",
+        LINK_Main = 1,
+    })
+end
+
+local function SafeGetConnectedOutput(inp)
+    if not inp then return nil end
+    local ok, out = pcall(function() return inp:GetConnectedOutput() end)
+    if ok and out then return out end
+    return nil
+end
+
+local function SafeGetTool(out)
+    if not out then return nil end
+    local ok, t = pcall(function() return out:GetTool() end)
+    if ok and t then return t end
+    return nil
+end
+
+local function GetClipFromTool(tool, comp, time)
+    if not tool then return nil end
+    local ok_reg, reg = pcall(function() return tool:GetAttrs().TOOLS_RegID end)
+    if not ok_reg or not reg then return nil end
+
+    if reg == "MediaIn" or reg == "Loader" then
+        local attrs = {}
+        pcall(function() attrs = tool:GetAttrs() or {} end)
+
+        -- 1. Check Loader TOOLST_Clip_Name
+        if attrs.TOOLST_Clip_Name and attrs.TOOLST_Clip_Name[1] then
+            local raw = attrs.TOOLST_Clip_Name[1]
+            local fn = comp and comp:MapPath(raw) or raw
+            if fn and fn ~= "" and string.find(fn, "%.[a-zA-Z0-9]+$") then
+                log_debug("Found TOOLST_Clip_Name in " .. tostring(tool.Name) .. ": " .. tostring(fn))
+                return fn
+            end
+        end
+
+        -- 2. Scan string attributes for video file paths
+        for ak, av in pairs(attrs) do
+            if type(av) == "string" then
+                local low = string.lower(av)
+                if string.find(low, "%.mp4$") or string.find(low, "%.mov$") or string.find(low, "%.mkv$") or string.find(low, "%.avi$") or string.find(low, "%.m4v$") then
+                    log_debug("Found video attr in " .. tostring(tool.Name) .. ": " .. tostring(av))
+                    return av
+                end
+            end
+        end
+
+        -- 3. Check tool's output image metadata across candidate frames
+        local candidate_frames = {}
+        if time and time > 0 then table.insert(candidate_frames, time) end
+        if comp and comp.CurrentTime and comp.CurrentTime > 0 then table.insert(candidate_frames, comp.CurrentTime) end
+        if attrs.TOOLNT_GlobalIn then table.insert(candidate_frames, attrs.TOOLNT_GlobalIn) end
+        if attrs.TOOLNT_GlobalIn and attrs.TOOLNT_GlobalOut then
+            table.insert(candidate_frames, math.floor((attrs.TOOLNT_GlobalIn + attrs.TOOLNT_GlobalOut) / 2))
+            table.insert(candidate_frames, math.max(0, attrs.TOOLNT_GlobalOut - 1))
+        end
+        if comp and comp.RenderStart then table.insert(candidate_frames, comp.RenderStart) end
+        table.insert(candidate_frames, 0)
+
+        local ok_out, out = pcall(function() return tool.Output end)
+        if ok_out and out then
+            for _, t_eval in ipairs(candidate_frames) do
+                local ok_img, img = pcall(function() return out:GetValue(t_eval) end)
+                if ok_img and img and img.Metadata then
+                    if img.Metadata.Filename and img.Metadata.Filename ~= "" then
+                        log_debug("Found Filename at frame " .. tostring(t_eval) .. " in " .. tostring(tool.Name) .. ": " .. tostring(img.Metadata.Filename))
+                        return img.Metadata.Filename
+                    end
+                    for mk, mv in pairs(img.Metadata) do
+                        if type(mv) == "string" then
+                            local low = string.lower(mv)
+                            if string.find(low, "%.mp4$") or string.find(low, "%.mov$") or string.find(low, "%.mkv$") or string.find(low, "%.avi$") or string.find(low, "%.m4v$") then
+                                log_debug("Found Metadata[" .. tostring(mk) .. "] at frame " .. tostring(t_eval) .. " in " .. tostring(tool.Name) .. ": " .. tostring(mv))
+                                return mv
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function FindClipUpstream(tool, comp, time, depth)
+    depth = depth or 0
+    if not tool or depth > 30 then return nil end
+
+    local fn = GetClipFromTool(tool, comp, time)
+    if fn and fn ~= "" then return fn end
+
+    local ok_list, inputs = pcall(function() return tool:GetInputList() end)
+    if ok_list and inputs then
+        for _, inp in pairs(inputs) do
+            local ok_attrs, attrs = pcall(function() return inp:GetAttrs() end)
+            if ok_attrs and attrs and attrs.INPS_DataType == "Image" then
+                local out = SafeGetConnectedOutput(inp)
+                if out then
+                    local up = SafeGetTool(out)
+                    if up then
+                        local r = FindClipUpstream(up, comp, time, depth + 1)
+                        if r and r ~= "" then return r end
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function AutoFindClip(tool_instance, comp, time)
+    log_debug("AutoFindClip starting...")
+
+    -- 1. Upstream tracing from InImage
+    local ok_up, up_res = pcall(function()
+        local inputObj = InImage
+        if tool_instance then
+            pcall(function()
+                if tool_instance.Input then inputObj = tool_instance.Input end
+            end)
+        end
+        if inputObj then
+            local out = SafeGetConnectedOutput(inputObj)
+            if out then
+                local up = SafeGetTool(out)
+                if up then
+                    log_debug("Upstream tool found: " .. tostring(up.Name or "unknown"))
+                    local fn = FindClipUpstream(up, comp, time or (comp and comp.CurrentTime) or 0)
+                    if fn and fn ~= "" then return fn end
+                end
+            else
+                log_debug("InImage has no connected output.")
+            end
+        end
+        return nil
+    end)
+    if ok_up and up_res and up_res ~= "" then
+        log_debug("Resolved via upstream: " .. tostring(up_res))
+        return up_res
+    end
+
+    -- 2. Check all tools in comp (MediaIn / Loader)
+    local found_comp_clip = nil
+    if comp then
+        pcall(function()
+            local tools = comp:GetToolList(false) or {}
+            for _, t in pairs(tools) do
+                local fn = GetClipFromTool(t, comp, time)
+                if fn and fn ~= "" then
+                    found_comp_clip = fn
+                    log_debug("Found via comp tool " .. tostring(t.Name or "") .. ": " .. tostring(fn))
+                    break
+                end
+            end
+        end)
+    end
+    if found_comp_clip and found_comp_clip ~= "" then
+        return found_comp_clip
+    end
+
+    -- 3. Check DaVinci Resolve Timeline API (fast handles only, no blocking sockets)
+    local ok_res_api, res_clip = pcall(function()
+        local r = nil
+        pcall(function() r = fusion:GetResolve() end)
+        if not r then pcall(function() r = app:GetResolve() end) end
+        if not r then pcall(function() r = Resolve() end) end
+
+        if r then
+            local pm = r:GetProjectManager()
+            local proj = pm and pm:GetCurrentProject()
+            if proj then
+                local tl = proj:GetCurrentTimeline()
+                if tl then
+                    local it = tl:GetCurrentVideoItem()
+                    if it then
+                        local mpi = it:GetMediaPoolItem()
+                        if mpi then
+                            local p = mpi:GetClipProperty("File Path")
+                            if p and p ~= "" then
+                                log_debug("Found via tl:GetCurrentVideoItem: " .. tostring(p))
+                                return p
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return nil
+    end)
+    if ok_res_api and res_clip and res_clip ~= "" then
+        return res_clip
+    end
+
+    -- 4. Fast SQLite detector from active Resolve project
+    local ok_py, py_clip = pcall(function()
+        local pipe = io.popen('"E:\\Apps\\MyRotoTool\\.venv\\Scripts\\python.exe" "E:\\Apps\\MyRotoTool\\detect_clip.py"')
+        if pipe then
+            local res = pipe:read("*a")
+            pipe:close()
+            if res and res ~= "" then
+                res = string.gsub(res, "[\r\n]+$", "")
+                res = string.gsub(res, "^%s*(.-)%s*$", "%1")
+                if res ~= "" and res ~= "None" then
+                    log_debug("Found via detect_clip.py: " .. tostring(res))
+                    return res
+                end
+            end
+        end
+        return nil
+    end)
+    if ok_py and py_clip and py_clip ~= "" then
+        return py_clip
+    end
+
+    -- 5. Fallback: read existing current_clip.txt
+    local ok_cc, cc_clip = pcall(function()
+        local f = io.open("E:\\Apps\\MyRotoTool\\current_clip.txt", "r")
+        if f then
+            local content = f:read("*a")
+            f:close()
+            if content then
+                content = string.gsub(content, "[\r\n]+$", "")
+                content = string.gsub(content, "^%s*(.-)%s*$", "%1")
+                content = string.gsub(content, "^\239\187\191", "")  -- strip UTF-8 BOM
+                if content ~= "" then
+                    log_debug("Found via current_clip.txt fallback: " .. tostring(content))
+                    return content
+                end
+            end
+        end
+        return nil
+    end)
+    if ok_cc and cc_clip and cc_clip ~= "" then
+        return cc_clip
+    end
+
+    log_debug("AutoFindClip could not resolve new clip path.")
+    return ""
+end
+
+function NotifyChanged(inp, param, time)
+    local comp = self.Comp or (fusion and fusion:GetCurrentComp())
+
+    if inp == BtnLaunch and param and param.Value == 1 then
+        log_debug("1. Start AI Rotoscope button clicked!")
+        local clip = AutoFindClip(self, comp, time)
+        log_debug("AutoFindClip returned: '" .. tostring(clip) .. "'")
+
+        if clip and clip ~= "" then
+            pcall(function()
+                local f = io.open("E:\\Apps\\MyRotoTool\\current_clip.txt", "w")
+                if f then
+                    f:write(clip)
+                    f:close()
+                end
+            end)
+            log_debug("Successfully wrote NEW clip to current_clip.txt: " .. tostring(clip))
+        end
+
+        -- Refresh Timeline Context Bridge
+        pcall(function()
+            local p = io.popen('"E:\\Apps\\MyRotoTool\\.venv\\Scripts\\python.exe" "E:\\Apps\\MyRotoTool\\timeline_sync.py"')
+            if p then p:close() end
+        end)
+
+        -- Launch Python App
+        local launched = false
+        if bmd and bmd.openurl then
+            local ok_launch = pcall(function()
+                bmd.openurl("file:///E:/Apps/MyRotoTool/run_roto.bat")
+            end)
+            if ok_launch then
+                launched = true
+                log_debug("Triggered bmd.openurl batch launcher")
+            end
+        end
+        if not launched then
+            pcall(function()
+                os.execute('start "" "E:\\Apps\\MyRotoTool\\run_roto.bat"')
+            end)
+            log_debug("Triggered os.execute batch launcher (fallback)")
+        end
+    end
+
+end
+
+function Process(req)
+    OutImage:Set(req, InImage:GetValue(req))
+end
