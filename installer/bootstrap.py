@@ -111,15 +111,54 @@ def extract_zip(archive, destination):
 
 def create_shortcut(target, shortcut_path):
     icon_path = local_app_dir() / "assets" / "myrototool-icon.ico"
-    command = (
-        "$shell = New-Object -ComObject WScript.Shell; "
-        f"$shortcut = $shell.CreateShortcut('{shortcut_path}'); "
-        f"$shortcut.TargetPath = '{target}'; "
-        f"$shortcut.WorkingDirectory = '{Path(target).parent}'; "
-        f"$shortcut.IconLocation = '{icon_path},0'; "
-        "$shortcut.Save()"
-    )
-    run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command])
+    script = r"""
+param(
+    [Parameter(Mandatory = $true)][string]$Target,
+    [Parameter(Mandatory = $true)][string]$ShortcutPath,
+    [Parameter(Mandatory = $true)][string]$IconPath
+)
+$desktop = [Environment]::GetFolderPath('Desktop')
+if ([string]::IsNullOrWhiteSpace($desktop)) {
+    $desktop = Join-Path $env:USERPROFILE 'Desktop'
+}
+$ShortcutPath = Join-Path $desktop (Split-Path -Leaf $ShortcutPath)
+$shortcutDirectory = Split-Path -Parent $ShortcutPath
+if (-not (Test-Path -LiteralPath $shortcutDirectory)) {
+    New-Item -ItemType Directory -Path $shortcutDirectory -Force | Out-Null
+}
+$shell = New-Object -ComObject WScript.Shell
+$shortcut = $shell.CreateShortcut($ShortcutPath)
+$shortcut.TargetPath = $Target
+$shortcut.WorkingDirectory = Split-Path -Parent $Target
+if (Test-Path -LiteralPath $IconPath) {
+    $shortcut.IconLocation = "$IconPath,0"
+}
+$shortcut.Save()
+if (-not (Test-Path -LiteralPath $ShortcutPath)) {
+    throw "Shortcut was not created: $ShortcutPath"
+}
+"""
+    script_path = Path(tempfile.gettempdir()) / f"{APP_NAME}-create-shortcut.ps1"
+    script_path.write_text(script, encoding="utf-8")
+    try:
+        run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(script_path),
+                "-Target",
+                str(target),
+                "-ShortcutPath",
+                str(shortcut_path),
+                "-IconPath",
+                str(icon_path),
+            ]
+        )
+    finally:
+        script_path.unlink(missing_ok=True)
 
 
 def ensure_free_space():
@@ -244,7 +283,7 @@ class Installer:
                     f'"{vpython}" roto_app.py %*\n',
                     encoding="utf-8",
                 )
-                desktop = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop"
+                desktop = Path.home() / "Desktop"
                 create_shortcut(launcher, desktop / "MyRotoTool.lnk")
 
             self.message("Installation complete. Starting MyRotoTool...")
