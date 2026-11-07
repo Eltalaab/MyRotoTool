@@ -20,6 +20,8 @@ SAM2_ZIP_URL = "https://github.com/facebookresearch/sam2/archive/refs/heads/main
 MODEL_URL = "https://media.githubusercontent.com/media/Eltalaab/MyRotoTool/main/sam2_hiera_tiny.pt"
 PYTHON_URL = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
 PYTHON_SHA256 = ""
+MIN_FREE_BYTES = 7 * 1024**3
+TORCH_INDEX_URL = "https://download.pytorch.org/whl/cu121"
 
 
 def local_app_dir():
@@ -120,6 +122,26 @@ def create_shortcut(target, shortcut_path):
     run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command])
 
 
+def ensure_free_space():
+    free_bytes = shutil.disk_usage(Path(local_app_dir()).anchor or Path.home().anchor).free
+    if free_bytes < MIN_FREE_BYTES:
+        free_gb = free_bytes / 1024**3
+        raise RuntimeError(
+            f"At least 7 GB of free space is required during installation. "
+            f"Only {free_gb:.1f} GB is available."
+        )
+
+
+def remove_development_files(venv_dir):
+    """Keep runtime DLLs but remove package linker/import libraries."""
+    torch_lib = venv_dir / "Lib" / "site-packages" / "torch" / "lib"
+    if not torch_lib.is_dir():
+        return
+    for pattern in ("*.lib", "*.a"):
+        for path in torch_lib.rglob(pattern):
+            path.unlink(missing_ok=True)
+
+
 class Installer:
     def __init__(self, root):
         self.root = root
@@ -150,6 +172,7 @@ class Installer:
 
     def install(self):
         try:
+            ensure_free_space()
             app_dir = local_app_dir()
             app_dir.mkdir(parents=True, exist_ok=True)
             with tempfile.TemporaryDirectory(prefix="myroto-setup-") as temp:
@@ -187,10 +210,27 @@ class Installer:
                 packages = [
                     line.strip()
                     for line in requirements.read_text(encoding="utf-8").splitlines()
-                    if line.strip() and not line.strip().startswith("git+")
+                    if line.strip()
+                    and not line.strip().startswith("git+")
+                    and line.strip() not in {"torch", "torchvision"}
                 ]
                 run([str(vpython), "-m", "pip", "install", *packages])
+                self.message("Installing CUDA-enabled PyTorch...")
+                run(
+                    [
+                        str(vpython),
+                        "-m",
+                        "pip",
+                        "install",
+                        "torch==2.5.1",
+                        "torchvision==0.20.1",
+                        "--index-url",
+                        TORCH_INDEX_URL,
+                    ]
+                )
                 run([str(vpython), "-m", "pip", "install", str(sam2_source)])
+                self.message("Removing unused CUDA development files...")
+                remove_development_files(venv_dir)
 
                 model = app_dir / "sam2_hiera_tiny.pt"
                 if not model.is_file() or model.stat().st_size < 100_000_000:

@@ -10,14 +10,14 @@ AI-assisted rotoscoping tool for **DaVinci Resolve/Fusion** using Meta's SAM2 mo
 - Python 3.10 or newer
 - DaVinci Resolve installed (the Resolve/Fusion integration requires Resolve to be open)
 - Git and Git LFS
-- NVIDIA GPU with CUDA is recommended for faster processing. CPU mode may work, but it is significantly slower.
-- Enough disk space for Python packages, PyTorch, SAM2, and the model checkpoint
+- NVIDIA GPU with a compatible CUDA driver is required for the packaged installer.
+- At least 7 GB free space is required temporarily during installation. The installed CUDA runtime is trimmed to approximately 3.9 GB by removing development libraries that are not needed to run the application.
 
 ## Installation
 
 ### One-click online installer
 
-For Windows users, download `MyRotoTool-Setup.exe` from the repository's [Releases page](https://github.com/Eltalaab/MyRotoTool/releases) and double-click it. The installer downloads Python 3.11, creates an isolated environment, installs PyTorch/SAM2 and the other dependencies, downloads the SAM2 model, creates a desktop shortcut, and starts the tool. Internet access is required during the first installation and the download may be several gigabytes because PyTorch and its runtime are large.
+For Windows users with an NVIDIA GPU and a compatible CUDA driver, download `MyRotoTool-Setup.exe` from the repository's [Releases page](https://github.com/Eltalaab/MyRotoTool/releases) and double-click it. The installer downloads Python 3.11, creates an isolated environment, installs CUDA-enabled PyTorch 2.5.1 (CUDA 12.1), SAM2 and the other dependencies, downloads the SAM2 model, removes unused development libraries, creates a desktop shortcut, and starts the tool. Internet access is required during the first installation.
 
 The installer stores the application under:
 
@@ -25,7 +25,7 @@ The installer stores the application under:
 %LOCALAPPDATA%\MyRotoTool
 ```
 
-The installer is an online bootstrapper, so it remains small. It does not contain Python, PyTorch, or the model inside the EXE.
+The installer is an online bootstrapper, so it remains small. It does not contain Python, PyTorch, or the model inside the EXE. The final installed footprint is targeted at approximately 3.9 GB, while at least 7 GB of free disk space is needed during installation.
 The installed desktop shortcut and the running MyRotoTool window use the MyRotoTool icon instead of the default Python icon.
 
 ### Manual installation
