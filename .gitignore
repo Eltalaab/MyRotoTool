@@ -7,4 +7,6 @@ current_clip.txt
 node_clip.json
 roto_storage/
 sam2_repo/
-
+build/
+*.spec
+installer/dist/

@@ -13,6 +13,20 @@ AI-assisted rotoscoping tool for **DaVinci Resolve/Fusion** using Meta's SAM2 mo
 
 ## Installation
 
+### One-click online installer
+
+For Windows users, download `MyRotoTool-Setup.exe` from the repository's [Releases page](https://github.com/Eltalaab/MyRotoTool/releases) and double-click it. The installer downloads Python 3.11, creates an isolated environment, installs PyTorch/SAM2 and the other dependencies, downloads the SAM2 model, creates a desktop shortcut, and starts the tool. Internet access is required during the first installation and the download may be several gigabytes because PyTorch and its runtime are large.
+
+The installer stores the application under:
+
+```text
+%LOCALAPPDATA%\MyRotoTool
+```
+
+The installer is an online bootstrapper, so it remains small. It does not contain Python, PyTorch, or the model inside the EXE.
+
+### Manual installation
+
 1. Install Python from [python.org](https://www.python.org/downloads/). During installation, enable **Add Python to PATH**.
 2. Install Git from [git-scm.com](https://git-scm.com/downloads) and Git LFS from [git-lfs.com](https://git-lfs.com/).
 3. Clone the repository:
@@ -42,6 +56,16 @@ AI-assisted rotoscoping tool for **DaVinci Resolve/Fusion** using Meta's SAM2 mo
    ```powershell
    git lfs pull
    ```
+
+### Building the installer
+
+To build the setup EXE from source on Windows:
+
+```powershell
+.\installer\build_installer.ps1
+```
+
+The output is `installer\dist\MyRotoTool-Setup.exe`. Upload this file to a GitHub Release rather than committing it to the source repository.
 
 ## Running the application
 
